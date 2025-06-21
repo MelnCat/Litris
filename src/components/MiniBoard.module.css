@@ -1,0 +1,18 @@
+.miniBoard {
+	display: grid;
+	grid-template-columns: repeat(var(--rows), 1fr);
+	gap: 0.1em;
+	width: fit-content;
+	margin: 0.3em 0;
+}
+.miniBoardTile {
+	width: 1em;
+	aspect-ratio: 1 / 1;
+	&[data-tile="X"] {
+		background-color: var(--dark);
+	}
+	&[data-tile="O"] {
+		background-color: #ffffff;
+	}
+	background-color: #77777777;
+}

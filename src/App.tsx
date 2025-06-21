@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useEventListener, useHover } from "usehooks-ts";
 import styles from "./App.module.css";
-import { itemCache } from "./data/items";
+import { itemCache, items } from "./data/items";
 
 const sampleSize = <T,>(arr: T[], n: number): T[] => {
 	const remaining = arr.slice(0);
@@ -28,6 +28,10 @@ const createGrid = () => {
 	for (const tile of sampleSize(tiles, 7)) {
 		tile.v = "S";
 	}
+	for (let i = 0; i < 14; i++) {
+		const row = tiles.filter(x => x.i === i);
+		if (row.every(x => x.v === "X")) row[Math.floor(Math.random() * row.length)].v = "O";
+	}
 	return tiles;
 };
 
@@ -37,10 +41,15 @@ const TooltipContainer = ({ children, contents, anchor }: { children: ReactNode;
 	return (
 		<div className={styles.itemBox} ref={ref}>
 			{children}
-			{isHovered && <div className={styles.tooltipBox} data-anchor={anchor ?? "bottom"}>{contents}</div>}
+			{isHovered && (
+				<div className={styles.tooltipBox} data-anchor={anchor ?? "bottom"}>
+					{contents}
+				</div>
+			)}
 		</div>
 	);
 };
+
 
 function App() {
 	const [board, setBoard] = useState(createGrid());
@@ -49,9 +58,10 @@ function App() {
 	const [score, setScore] = useState(0);
 	const [moves, setMoves] = useState(5);
 	const [combo, setCombo] = useState(0);
-	const [tools, setTools] = useState<string[]>(["shovel", "fork"]);
+	const [tools, setTools] = useState<string[]>(items.filter(x => x.category === "tool").map(x => x.id));
 	const [toolIndex, setToolIndex] = useState(0);
 	const currentTool = useMemo(() => itemCache[tools[toolIndex]], [tools, toolIndex]);
+	const targetRow = 5;
 	const cache = useMemo(
 		() =>
 			board.reduce((l, c) => {
@@ -103,7 +113,7 @@ function App() {
 			S: "O",
 			R: "S",
 		};
-		const newBoard = board.flatMap(x => (currentTool.interacting(ci, cj, x.i, x.j) ? (b === 0 ? { ...x, v: changes[x.v] } : x.v === "O" || x.v === "X" ? [] : x) : x));
+		const newBoard = board.flatMap(x => (currentTool.interacting(ci, cj, x.i, x.j) ? (b === 0 ? { ...x, v: changes[x.v] } : currentTool.ability.use(x)) : x));
 		checkClears(false, newBoard);
 		setMoves(x => x - 1);
 	};
@@ -173,15 +183,44 @@ function App() {
 					<div className={styles.toolbar}>
 						<div className={styles.toolList}>
 							{tools.map((x, i) => (
-								<TooltipContainer anchor="right" contents={<><h1>{itemCache[x].name}</h1><p>{itemCache[x].description}</p></>} key={x}>
-									<div className={styles.tool} key={x} data-selected={toolIndex === i ? true : null}>
+								<TooltipContainer
+									anchor="right"
+									contents={
+										<>
+											<div className={styles.tooltipLabel} data-type="tool">
+												Tool
+											</div>
+											<h1>{itemCache[x].name}</h1>
+											<p>{itemCache[x].description}</p>
+										</>
+									}
+									key={x}
+								>
+									<div className={styles.tool} key={x} data-selected={toolIndex === i ? true : null} onClick={() => setToolIndex(i)}>
 										{x}
 									</div>
 								</TooltipContainer>
 							))}
 						</div>
 						<div className={styles.toolAbilityBox}>
-							<div className={styles.toolAbility}></div>
+							<div className={styles.toolAbility}>
+								<TooltipContainer
+									anchor="right"
+									contents={
+										<>
+											<div className={styles.tooltipLabel} data-type="ability">
+												Tool Ability
+											</div>
+											<h1>{currentTool.ability.name}</h1>
+											<p>{currentTool.ability.description}</p>
+										</>
+									}
+								>
+									<div className={styles.tool} data-selected>
+										ability: {currentTool.ability.id}
+									</div>
+								</TooltipContainer>
+							</div>
 						</div>
 					</div>
 					<div className={styles.board} style={{ "--rows": 9 }} data-lost={moves === 0 ? true : null}>
@@ -216,6 +255,9 @@ function App() {
 								})
 							)}
 						</AnimatePresence>
+					</div>
+					<div className={styles.energyBar}>
+						
 					</div>
 				</div>
 			</main>

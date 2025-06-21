@@ -53,7 +53,7 @@
 	}
 }
 .comboRow {
-	height: 2em;
+	height: 4em;
 }
 .center {
 	display: flex;
@@ -63,35 +63,60 @@
 
 .toolbar {
 	display: flex;
-	flex-direction: column;  gap: 0.5em;
+	flex-direction: column;
+	gap: 0.5em;
 }
 .toolList {
+	display: flex;
+	flex-direction: column;
 	padding: 0.2em;
 	border: 0.2em solid var(--light);
 	gap: 0.2em;
-	flex-grow: 1;  
+	flex-grow: 1;
 }
 .toolAbilityBox {
 	padding: 0.2em;
 	border: 0.2em solid var(--light);
 }
 .toolAbility {
-	width: 3em;
+	width: 5em;
 	aspect-ratio: 1 / 1;
 }
 .tool {
+	text-align: center;
 	aspect-ratio: 1 / 1;
 	color: var(--light);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	width: 5em;
+	cursor: pointer;
+	&:hover {
+		border: 0.2em solid #eeeeee33;
+	}
 	&[data-selected] {
-		background-color: #eeeeee33;
+		border: 0.2em solid #ffffffee;
 	}
 }
 .itemBox {
 	position: relative;
+}
+.tooltipLabel {
+	text-align: center;
+	color: white;
+	padding: 0.25em 1em;
+	width: fit-content;
+	margin: 0 auto;
+	font-weight: bold;
+	font-size: 0.85em;
+	margin-bottom: -0.4em;
+	min-width: 6em;
+	&[data-type="tool"] {
+		background-color: #ce5252;
+	}
+	&[data-type="ability"] {
+		background-color: #8e6bdf;
+	}
 }
 .tooltipBox {
 	position: absolute;
@@ -101,7 +126,7 @@
 	color: var(--light);
 	padding: 0.5em;
 	z-index: 2;
-	width: 16em;
+	width: 18em;
 	display: flex;
 	flex-direction: column;
 	gap: 0.5em;
@@ -117,7 +142,6 @@
 		left: calc(100% + 0.75em);
 		top: 0;
 	}
-
 }
 .combo {
 	font-size: 3em;
