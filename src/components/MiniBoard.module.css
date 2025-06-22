@@ -14,5 +14,20 @@
 	&[data-tile="O"] {
 		background-color: #ffffff;
 	}
+	&[data-tile="!"] {
+		background-color: #ffffff;
+		animation: red-flash infinite 2s linear;
+	}
 	background-color: #77777777;
+}
+@keyframes red-flash {
+	0% {
+		background-color: #ffffff;
+	}
+	50% {
+		background-color: #b92323;
+	}
+	100% {
+		background-color: #ffffff;
+	}
 }
