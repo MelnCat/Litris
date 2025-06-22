@@ -152,8 +152,8 @@ export const items = [
 		rarity: "rare"
 	},
 	{
-		id: "paintball",
-		name: "Paintball",
+		id: "paint",
+		name: "Paint",
 		category: "trinket",
 		description() {
 			return (

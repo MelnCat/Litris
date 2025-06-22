@@ -4,7 +4,7 @@ import { useEventListener, useHover } from "usehooks-ts";
 import styles from "./App.module.css";
 import { itemCache, items, toolCache, trinketCache, type TrinketItem } from "./data/items";
 import { digTile } from "./util/tiles";
-import shopImage from "./assets/shop.png";
+import shopImage from "./assets/shop.png?inline";
 
 const sampleSize = <T,>(arr: T[], n: number): T[] => {
 	const remaining = arr.slice(0);
@@ -24,12 +24,17 @@ const createTile = () => {
 	return Math.random() > 0.5 ? "O" : "X";
 };
 
-const createGrid = () => {
+const createGrid = (level: number) => {
 	const tiles: { i: number; j: number; v: string; id: string }[] = [];
 	for (let i = 0; i < 14; i++) for (let j = 0; j < 9; j++) tiles.push({ i, j, v: createTile(), id: crypto.randomUUID() });
-	for (const tile of sampleSize(tiles, 7)) {
-		tile.v = "S";
-	}
+	if (level >= 3)
+		for (const tile of sampleSize(tiles, 7 + Math.min(level - 3, 10))) {
+			tile.v = "S";
+		}
+	if (level >= 10)
+		for (const tile of sampleSize(tiles, 7 + Math.min(level - 10, 5))) {
+			tile.v = "R";
+		}
 	for (let i = 0; i < 14; i++) {
 		const row = tiles.filter(x => x.i === i);
 		if (row.every(x => x.v === "X")) row[Math.floor(Math.random() * row.length)].v = "O";
@@ -51,17 +56,35 @@ const TooltipContainer = ({ children, contents, anchor }: { children: ReactNode;
 		</div>
 	);
 };
+let mouseX = 0;
+let mouseY = 0;
+export const CursorAnchor = ({ children }: { children: ReactNode }) => {
+	const [mousePos, setMousePos] = useState([mouseX, mouseY]);
+	useEventListener("mousemove", e => {
+		setMousePos([e.x, e.y]);
+		mouseX = e.x;
+		mouseY = e.y;
+	});
+	return (
+		(mousePos[0] !== 0 || mousePos[1] !== 0) && (
+			<div className={styles.cursorAnchor} style={{ left: `${mousePos[0]}px`, top: `${mousePos[1]}px` }}>
+				{children}
+			</div>
+		)
+	);
+};
 
 type GameStage = "play" | "shop";
 
 function App() {
 	const [level, setLevel] = useState(1);
-	const [board, setBoard] = useState(createGrid());
+	const [board, setBoard] = useState(createGrid(1));
 	const [hovered, setHovered] = useState<null | [number, number]>();
 	const [active, setActive] = useState<null | [number, number]>();
 	const [score, setScore] = useState(0);
 	const [moves, setMoves] = useState(5);
 	const [combo, setCombo] = useState(0);
+	const [maxCombo, setMaxCombo] = useState(0);
 	const [tools, setTools] = useState<string[]>(items.filter(x => x.category === "tool").map(x => x.id));
 	const [trinkets, setTrinkets] = useState<string[]>(items.filter(x => x.category === "trinket").map(x => x.id));
 	const [trinketIndex, setTrinketIndex] = useState(-1);
@@ -69,6 +92,9 @@ function App() {
 	const [toolIndex, setToolIndex] = useState(0);
 	const [energy, setEnergy] = useState(0);
 	const [stage, setStage] = useState<GameStage>("play");
+	const [levelComplete, setLevelComplete] = useState(false);
+	const [targetRow, setTargetRow] = useState(5);
+	const [money, setMoney] = useState(0);
 	const topRow = useMemo(() => {
 		for (let i = 0; i < 14; i++) {
 			if (!board.some(x => x.i === i)) continue;
@@ -84,7 +110,14 @@ function App() {
 		return trinketCache[id];
 	}, [trinkets, trinketIndex, trinketUses]) as TrinketItem | null;
 	const [button, setButton] = useState<null | number>(null);
-	const targetRow = 5;
+	const moneyGain = useMemo(() => {
+		const gain: { text: string; amount: number }[] = [{ text: "Level Completion", amount: 2 }];
+		if (energy >= maxEnergy) gain.push({ text: "Maximum Energy Remaining", amount: 1 });
+		if (board.length <= 0) gain.push({ text: "Full Clear", amount: 1 });
+		if (maxCombo > 0) gain.push({ text: `Max Combo: ${maxCombo}`, amount: Math.ceil(maxCombo / 5) });
+		if (score > 1000000) gain.push({ text: `Amazing Score`, amount: 2 });
+		return gain;
+	}, [board.length, energy, maxCombo, score]);
 	const cache = useMemo(
 		() =>
 			board.reduce((l, c) => {
@@ -108,6 +141,7 @@ function App() {
 		}
 		if (removedRows > 0) {
 			setCombo(x => x + removedRows);
+			if (combo + removedRows > maxCombo) setMaxCombo(combo + removedRows);
 			setScore(x => x + removedTiles * 1000 * (1 + (removedRows - 1) / 2) * (1 + combo / 2));
 			if (topRow < targetRow) setMoves(x => x + 3 * removedRows);
 			setEnergy(x => Math.min(maxEnergy, x + removedRows));
@@ -128,6 +162,11 @@ function App() {
 				checkClears(keepCombo, hasCleared || removedRows > 0, b);
 			}, 250);
 		else if (!hasCleared && !removedRows && !keepCombo) setCombo(0);
+		if (b.length === 0) {
+			setTimeout(() => {
+				setLevelComplete(true);
+			}, 500);
+		}
 	};
 	const click = (ci: number, cj: number, b: number) => {
 		if (b === 2 && energy <= 0) return;
@@ -147,6 +186,28 @@ function App() {
 		checkClears(false, false, newBoard);
 		setMoves(x => x - 1);
 		if (b === 2) setEnergy(x => x - 1);
+		if (moves === 1 || newBoard.length === 0) {
+			setTimeout(() => {
+				setLevelComplete(true);
+			}, 500);
+		}
+	};
+	const nextLevel = () => {
+		setLevel(level + 1);
+		setStage("play");
+		setBoard(createGrid(level + 1));
+		setMoves(5);
+		setTargetRow(Math.min(5 + level, 14));
+	};
+	const openShop = () => {
+		setStage("shop");
+		setScore(0);
+		setCombo(0);
+		setEnergy(0);
+		setTrinketUses({});
+		setMaxCombo(0);
+		setMoney(money + moneyGain.reduce((l, c) => l + c.amount, 0));
+		setLevelComplete(false);
 	};
 	useEventListener("mouseup", () => {
 		setActive(null);
@@ -158,8 +219,29 @@ function App() {
 	});
 	return (
 		<>
+			{hovered && (
+				<CursorAnchor>
+					<div className={styles.cursorMoves} data-trinket={currentTrinket?.name}>
+						{currentTrinket ? (
+							<>
+								<div>
+									<b>{currentTrinket.name}</b>
+								</div>
+								{currentTrinket.uses ? currentTrinket.uses - (trinketUses[currentTrinket.id] ?? 0) : "∞"}/{currentTrinket.uses ?? "∞"} Uses
+							</>
+						) : (
+							<div>
+								{moves} Move{moves === 1 ? "" : "s"} Left
+							</div>
+						)}
+					</div>
+				</CursorAnchor>
+			)}
 			<main className={styles.main} onContextMenu={e => e.preventDefault()}>
 				<div className={styles.headerRows}>
+					<div className={styles.levelRow}>
+						<div>Level {level}</div>
+					</div>
 					<div className={styles.header}>
 						{stage === "play" && (
 							<>
@@ -171,7 +253,6 @@ function App() {
 									</div>
 								</AnimatePresence>
 
-								{moves === 0 && <div className={styles.loseMessage}>YOU {topRow > targetRow ? "WON" : "LOST"}!</div>}
 								<div className={styles.moves} data-moves={moves}>
 									{moves}
 								</div>
@@ -242,7 +323,7 @@ function App() {
 								Buy and sell items!
 							</div>
 						)}
-						<div className={styles.balance}>$0</div>
+						<div className={styles.balance}>${money}</div>
 					</div>
 				</div>
 				<div className={styles.inventory}>
@@ -279,8 +360,36 @@ function App() {
 					})}
 				</div>
 				<div className={styles.center}>
+					<AnimatePresence>
+						{stage === "play" &&
+							levelComplete &&
+							(topRow >= targetRow ? (
+								<motion.div className={styles.winScreen} layout initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+									<h1>Level Complete</h1>
+									<p>
+										You scored {score} points and cleared {topRow} rows.
+									</p>
+									{moneyGain.map(x => (
+										<div className={styles.moneyGain} key={x.text}>
+											<div className={styles.moneyGainLevel}>{x.text}</div>
+											<div className={styles.moneyGainAmount}>${x.amount}</div>
+										</div>
+									))}
+									<div className={styles.moneyGain}>
+										<div className={styles.moneyGainLevel}><b>Total</b></div>
+										<div className={styles.moneyGainAmount}><b>${moneyGain.reduce((l, c) => l + c.amount, 0)}</b></div>
+									</div>
+									<button onClick={openShop}>Go to Shop</button>
+								</motion.div>
+							) : (
+								<motion.div className={styles.loseScreen} layout initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+									<h1>Game Over</h1>
+									<p>You did not meet the line clearing requirement.</p>
+								</motion.div>
+							))}
+					</AnimatePresence>
 					<div className={styles.toolbar}>
-						<div className={styles.toolList}>
+						<motion.div layout className={styles.toolList}>
 							{tools.map((x, i) => (
 								<TooltipContainer
 									anchor="right"
@@ -300,8 +409,8 @@ function App() {
 									</div>
 								</TooltipContainer>
 							))}
-						</div>
-						<div className={styles.toolAbilityBox}>
+						</motion.div>
+						<motion.div layout className={styles.toolAbilityBox}>
 							<div className={styles.toolAbility}>
 								<TooltipContainer
 									anchor="right"
@@ -320,10 +429,10 @@ function App() {
 									</div>
 								</TooltipContainer>
 							</div>
-						</div>
+						</motion.div>
 					</div>
 					{stage === "play" && (
-						<div className={styles.board} style={{ "--rows": 9 }} data-lost={moves === 0 ? true : null}>
+						<motion.div layout layoutId="center" className={styles.board} style={{ "--rows": 9 }} data-lost={moves === 0 ? true : null}>
 							<motion.div className={styles.targetLine} initial={{ "--index": 0 }} animate={{ "--index": targetRow }} />
 							{moves <= 0 && <div className={styles.loseOverlay} />}
 							<AnimatePresence>
@@ -362,26 +471,42 @@ function App() {
 									})
 								)}
 							</AnimatePresence>
-						</div>
+						</motion.div>
 					)}
 					{stage === "shop" && (
-						<div className={styles.shop}>
+						<motion.div layout layoutId="center" className={styles.shop}>
 							<div className={styles.shopTop}>
 								<div className={styles.shopLeft}>
 									<img alt="Shop" className={styles.shopImage} src={shopImage} />
 								</div>
 								<div className={styles.shopRight}></div>
 							</div>
-							<div className={styles.shopBottom}></div>
-						</div>
+							<div className={styles.shopBottom}>
+								<button onClick={nextLevel}>Next Level</button>
+							</div>
+						</motion.div>
 					)}
-					<div className={styles.energyBar} style={{ "--max-energy": maxEnergy }} data-highlight={button === 2 && energy === 0 && !currentTrinket ? true : null}>
+					<motion.div
+						layout
+						className={styles.energyBar}
+						style={{ "--max-energy": maxEnergy }}
+						data-highlight={button === 2 && energy === 0 && !currentTrinket ? true : null}
+					>
 						<AnimatePresence>
 							{[...Array(energy)].map((_, i) => (
 								<motion.div className={styles.energyTile} key={i} initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} />
 							))}
 						</AnimatePresence>
-					</div>
+					</motion.div>
+				</div>
+				<div className={styles.footer}>
+					<AnimatePresence>
+						{stage === "play" && topRow >= targetRow && (
+							<motion.div layout initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+								You have completed the line requirement. You will no longer naturally regain moves.
+							</motion.div>
+						)}
+					</AnimatePresence>
 				</div>
 			</main>
 		</>

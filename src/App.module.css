@@ -8,7 +8,7 @@
 	position: relative;
 	-webkit-user-drag: none;
 	&[data-lost] {
-		border-color: #ce5252;
+		border-color: #707070;
 	}
 }
 .shop {
@@ -31,10 +31,8 @@
 	display: flex;
 }
 .shopBottom {
-
 }
 .shopItem {
-	
 }
 .loseOverlay {
 	position: absolute;
@@ -43,8 +41,8 @@
 	width: 100%;
 	height: 100%;
 	z-index: 2;
-	background-color: #a292925e;
-	mix-blend-mode: overlay;
+	background-color: #0000009c;
+	mix-blend-mode: color-burn;
 }
 .headerRows {
 	display: flex;
@@ -78,10 +76,23 @@
 		color: #c3d1ff;
 	}
 }
+.levelRow {
+	display: flex;
+	height: 3em;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #ffffff;
+	& > div {
+		font-size: 3em;
+		filter: drop-shadow(#5b5b5b 0.08em 0.08em);
+		font-weight: bold;
+	}
+}
 .comboRow {
 	display: flex;
 	height: 4em;
-	div {
+	& > div {
 		font-size: 3em;
 		filter: drop-shadow(#5b5b5b 0.08em 0.08em);
 		font-weight: bold;
@@ -101,6 +112,7 @@
 	display: flex;
 	gap: 1em;
 	margin: 2em;
+	position: relative;
 }
 
 .toolbar {
@@ -315,4 +327,60 @@
 .shopImage {
 	width: 100%;
 	image-rendering: pixelated;
+}
+.winScreen,
+.loseScreen {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	translate: -50% -50%;
+	width: 85%;
+	height: 80%;
+	background-color: #111111;
+	padding: 1em 1em;
+	border: var(--light) 0.2em solid;
+	color: var(--light);
+	z-index: 100;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+	font-size: 1.3em;
+	h1,
+	p {
+		margin: 0;
+		padding: 0;
+	}
+}
+.cursorAnchor {
+	position: fixed;
+	z-index: 1000;
+	pointer-events: none;
+}
+.cursorMoves {
+	background-color: #000000cc;
+	backdrop-filter: blur(4px);
+	padding: 0.75em;
+	border: var(--light) 0.2em solid;
+	color: var(--light);
+	translate: 0.8em 1.5em;
+	&[data-trinket] {
+		border-color: #9ec280;
+	}
+}
+.footer {
+	color: var(--light);
+	font-size: 1.2em;
+}
+.moneyGain {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.2em 0.4em;
+	background-color: #ffffff11;
+	.moneyGainLabel {
+		color: #f7d792;
+	}
+	.moneyGainAmount {
+		font-weight: bold;
+	}
 }
