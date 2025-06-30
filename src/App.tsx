@@ -2,9 +2,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useEventListener, useHover } from "usehooks-ts";
 import styles from "./App.module.css";
-import { itemCache, items, toolCache, trinketCache, type TrinketItem } from "./data/items";
-import { digTile } from "./util/tiles";
 import shopImage from "./assets/shop.png?inline";
+import { generateShop, itemCache, items, type ShopContents, toolCache, trinketCache, type Item, type TrinketItem } from "./data/items";
+import { digTile } from "./util/tiles";
 
 const sampleSize = <T,>(arr: T[], n: number): T[] => {
 	const remaining = arr.slice(0);
@@ -16,23 +16,23 @@ const sampleSize = <T,>(arr: T[], n: number): T[] => {
 	return values;
 };
 
-const createTile = () => {
+const createTile = (level: number) => {
 	// if (Math.random() > 0.95) {
 	// 	//if (Math.random() > 0.9) return "R";
 	// 	return "S";
 	// }
-	return Math.random() > 0.5 ? "O" : "X";
+	return Math.random() < 1 / 2 + level * 0.01 ? "O" : "X";
 };
 
 const createGrid = (level: number) => {
 	const tiles: { i: number; j: number; v: string; id: string }[] = [];
-	for (let i = 0; i < 14; i++) for (let j = 0; j < 9; j++) tiles.push({ i, j, v: createTile(), id: crypto.randomUUID() });
+	for (let i = 0; i < 14; i++) for (let j = 0; j < 9; j++) tiles.push({ i, j, v: createTile(level), id: crypto.randomUUID() });
 	if (level >= 3)
-		for (const tile of sampleSize(tiles, 7 + Math.min(level - 3, 10))) {
+		for (const tile of sampleSize(tiles, 7 + Math.min(level - 3, 50))) {
 			tile.v = "S";
 		}
 	if (level >= 10)
-		for (const tile of sampleSize(tiles, 7 + Math.min(level - 10, 5))) {
+		for (const tile of sampleSize(tiles, 7 + Math.min(level - 10, 25))) {
 			tile.v = "R";
 		}
 	for (let i = 0; i < 14; i++) {
@@ -73,10 +73,65 @@ export const CursorAnchor = ({ children }: { children: ReactNode }) => {
 		)
 	);
 };
-
+export const ItemBox = ({
+	item,
+	anchor,
+	onClick,
+	data,
+	showCost,
+}: {
+	item: Item;
+	anchor: "bottom" | "right";
+	onClick: (e: React.MouseEvent) => void;
+	showCost?: boolean;
+	data?: { uses?: number; unusable?: boolean; selected?: boolean };
+}) => {
+	return (
+		<TooltipContainer
+			anchor={anchor}
+			contents={
+				<>
+					<div className={styles.tooltipLabel} data-type={item.category}>
+						{item.category[0].toUpperCase()}
+						{item.category.slice(1)}
+					</div>
+					<h1 data-rarity={item.rarity}>{item.name}</h1>
+					<div>{item.description(null)}</div>
+					{item.category === "trinket" && (
+						<div className={styles.trinketUses} data-unusable={data?.unusable || null}>
+							{data?.uses ?? "∞"}/{item.uses ?? "∞"} Uses
+						</div>
+					)}
+					{showCost && (
+						<div className={styles.itemCost} data-unaffordable={data?.unusable || null}>
+							${item.cost}
+						</div>
+					)}
+				</>
+			}
+		>
+			<div className={styles.tool} data-selected={data?.selected === true ? true : null} onClick={onClick} data-unusable={data?.unusable || null}>
+				{item.id}
+			</div>
+		</TooltipContainer>
+	);
+};
 type GameStage = "play" | "shop";
-
+const DEBUG = true;
 function App() {
+	if (DEBUG) {
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		useEventListener("keypress", e => {
+			if (e.key === "i") {
+				setTools(items.filter(x => x.category === "tool").map(x => x.id));
+				setTrinkets(items.filter(x => x.category === "trinket").map(x => x.id));
+			}
+			if (e.key === "s") {
+				setMoney(100);
+				openShop();
+			}
+		});
+	}
 	const [level, setLevel] = useState(1);
 	const [board, setBoard] = useState(createGrid(1));
 	const [hovered, setHovered] = useState<null | [number, number]>();
@@ -85,8 +140,8 @@ function App() {
 	const [moves, setMoves] = useState(5);
 	const [combo, setCombo] = useState(0);
 	const [maxCombo, setMaxCombo] = useState(0);
-	const [tools, setTools] = useState<string[]>(items.filter(x => x.category === "tool").map(x => x.id));
-	const [trinkets, setTrinkets] = useState<string[]>(items.filter(x => x.category === "trinket").map(x => x.id));
+	const [tools, setTools] = useState<string[]>(["shovel"]);
+	const [trinkets, setTrinkets] = useState<string[]>([]);
 	const [trinketIndex, setTrinketIndex] = useState(-1);
 	const [trinketUses, setTrinketUses] = useState({} as Record<string, number>);
 	const [toolIndex, setToolIndex] = useState(0);
@@ -95,6 +150,7 @@ function App() {
 	const [levelComplete, setLevelComplete] = useState(false);
 	const [targetRow, setTargetRow] = useState(5);
 	const [money, setMoney] = useState(0);
+	const [shopContents, setShopContents] = useState<ShopContents | null>(null);
 	const topRow = useMemo(() => {
 		for (let i = 0; i < 14; i++) {
 			if (!board.some(x => x.i === i)) continue;
@@ -112,7 +168,7 @@ function App() {
 	const [button, setButton] = useState<null | number>(null);
 	const moneyGain = useMemo(() => {
 		const gain: { text: string; amount: number }[] = [{ text: "Level Completion", amount: 2 }];
-		if (energy >= maxEnergy) gain.push({ text: "Maximum Energy Remaining", amount: 1 });
+		if (energy >= maxEnergy) gain.push({ text: "Full Energy Bar", amount: 1 });
 		if (board.length <= 0) gain.push({ text: "Full Clear", amount: 1 });
 		if (maxCombo > 0) gain.push({ text: `Max Combo: ${maxCombo}`, amount: Math.ceil(maxCombo / 5) });
 		if (score > 1000000) gain.push({ text: `Amazing Score`, amount: 2 });
@@ -186,18 +242,22 @@ function App() {
 		checkClears(false, false, newBoard);
 		setMoves(x => x - 1);
 		if (b === 2) setEnergy(x => x - 1);
-		if (moves === 1 || newBoard.length === 0) {
+	};
+	useEffect(() => {
+		if (stage !== "play" || levelComplete) return;
+		if (moves === 0 || board.length === 0) {
 			setTimeout(() => {
 				setLevelComplete(true);
 			}, 500);
 		}
-	};
+	}, [moves, board.length, stage, levelComplete]);
 	const nextLevel = () => {
 		setLevel(level + 1);
 		setStage("play");
 		setBoard(createGrid(level + 1));
 		setMoves(5);
 		setTargetRow(Math.min(5 + level, 14));
+		setShopContents(null);
 	};
 	const openShop = () => {
 		setStage("shop");
@@ -208,6 +268,7 @@ function App() {
 		setMaxCombo(0);
 		setMoney(money + moneyGain.reduce((l, c) => l + c.amount, 0));
 		setLevelComplete(false);
+		setShopContents(generateShop(tools.concat(trinkets)));
 	};
 	useEventListener("mouseup", () => {
 		setActive(null);
@@ -219,7 +280,7 @@ function App() {
 	});
 	return (
 		<>
-			{hovered && (
+			{hovered && stage === "play" && (
 				<CursorAnchor>
 					<div className={styles.cursorMoves} data-trinket={currentTrinket?.name}>
 						{currentTrinket ? (
@@ -376,8 +437,12 @@ function App() {
 										</div>
 									))}
 									<div className={styles.moneyGain}>
-										<div className={styles.moneyGainLevel}><b>Total</b></div>
-										<div className={styles.moneyGainAmount}><b>${moneyGain.reduce((l, c) => l + c.amount, 0)}</b></div>
+										<div className={styles.moneyGainLevel}>
+											<b>Total</b>
+										</div>
+										<div className={styles.moneyGainAmount}>
+											<b>${moneyGain.reduce((l, c) => l + c.amount, 0)}</b>
+										</div>
 									</div>
 									<button onClick={openShop}>Go to Shop</button>
 								</motion.div>
@@ -385,6 +450,7 @@ function App() {
 								<motion.div className={styles.loseScreen} layout initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
 									<h1>Game Over</h1>
 									<p>You did not meet the line clearing requirement.</p>
+									<button onClick={() => location.reload()}>Play Again</button>
 								</motion.div>
 							))}
 					</AnimatePresence>
@@ -473,7 +539,7 @@ function App() {
 							</AnimatePresence>
 						</motion.div>
 					)}
-					{stage === "shop" && (
+					{stage === "shop" && shopContents && (
 						<motion.div layout layoutId="center" className={styles.shop}>
 							<div className={styles.shopTop}>
 								<div className={styles.shopLeft}>
@@ -482,6 +548,37 @@ function App() {
 								<div className={styles.shopRight}></div>
 							</div>
 							<div className={styles.shopBottom}>
+								<div className={styles.shopRows}>
+									{shopContents.main.map((x, i) => (
+										<div className={styles.shopItem} key={x?.id ?? i}>
+											<div>
+												{x ? (
+													<ItemBox
+														item={x}
+														anchor="bottom"
+														onClick={() => {
+															if (money < x.cost) return;
+															setMoney(money - x.cost);
+															if (x.category === "tool") setTools(tools.concat(x.id));
+															else if (x.category === "trinket") setTrinkets(trinkets.concat(x.id));
+															setShopContents({
+																...shopContents,
+																main: shopContents.main.map((y, j) => (i === j ? null : y)),
+															});
+														}}
+														showCost
+														data={{ unusable: money < x.cost }}
+													/>
+												) : (
+													<div className={styles.sold}>
+														<div className={styles.tool}>SOLD</div>
+													</div>
+												)}
+											</div>
+											<div className={styles.price} data-unusable={(x && money < x.cost) || null}>{x ? `$${x.cost}` : "-"}</div>
+										</div>
+									))}
+								</div>
 								<button onClick={nextLevel}>Next Level</button>
 							</div>
 						</motion.div>

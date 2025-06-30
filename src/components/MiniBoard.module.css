@@ -15,19 +15,19 @@
 		background-color: #ffffff;
 	}
 	&[data-tile="!"] {
-		background-color: #ffffff;
+		background-color: #b92323;
 		animation: red-flash infinite 2s linear;
 	}
 	background-color: #77777777;
 }
 @keyframes red-flash {
 	0% {
-		background-color: #ffffff;
-	}
-	50% {
 		background-color: #b92323;
 	}
-	100% {
+	50% {
 		background-color: #ffffff;
+	}
+	100% {
+		background-color: #b92323;
 	}
 }

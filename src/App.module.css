@@ -22,7 +22,7 @@
 	-webkit-user-drag: none;
 }
 .shopLeft {
-	width: 27em;
+	width: 16em;
 }
 .shopRight {
 	width: 15em;
@@ -32,7 +32,34 @@
 }
 .shopBottom {
 }
-.shopItem {
+.price {
+	text-align: center;
+	color: #ffffffee;
+	padding: 0.2em 0.4em;
+	font-weight: bold;
+	&[data-unusable] {
+		color: #ce5252;
+	}
+}
+.shopRows {
+	display: flex;
+	gap: 0.2em;
+	.shopItem {
+		.itemBox {
+			border: 0.2em solid #eeeeee33;
+			&:hover {
+				border: 0.2em solid #ffffffee;
+			}
+		}
+		.sold {
+			border: 0.2em solid #eeeeee22;
+			.tool {
+				border: none;
+				cursor: not-allowed;
+				color: #eeeeee33;
+			}
+		}
+	}
 }
 .loseOverlay {
 	position: absolute;
@@ -275,6 +302,13 @@
 	text-align: right;
 	&[data-unusable] {
 		opacity: 0.6;
+	}
+}
+.itemCost {
+	font-size: 1.5em;
+	font-weight: bold;
+	&[data-unaffordable] {
+		color: #ce5252;
 	}
 }
 .tile {

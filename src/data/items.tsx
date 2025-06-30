@@ -56,7 +56,7 @@ export const items = [
 			},
 		},
 		cost: 1,
-		rarity: "common"
+		rarity: "common",
 	},
 	{
 		id: "fork",
@@ -82,7 +82,7 @@ export const items = [
 			},
 		},
 		cost: 4,
-		rarity: "common"
+		rarity: "common",
 	},
 	// Trinkets
 	{
@@ -105,7 +105,7 @@ export const items = [
 			return board.filter(x => (x.v !== "O" && x.v !== "X") || !this.interacting(i, j, x.i, x.j));
 		},
 		cost: 6,
-		rarity: "rare"
+		rarity: "rare",
 	},
 	{
 		id: "star",
@@ -127,7 +127,7 @@ export const items = [
 			return board.filter(x => (x.v !== "O" && x.v !== "X") || !this.interacting(i, j, x.i, x.j));
 		},
 		cost: 5,
-		rarity: "rare"
+		rarity: "rare",
 	},
 	{
 		id: "powerwash",
@@ -149,7 +149,7 @@ export const items = [
 			return board.map(x => ({ ...x, v: digTile(x.v) }));
 		},
 		cost: 10,
-		rarity: "rare"
+		rarity: "rare",
 	},
 	{
 		id: "paint",
@@ -171,7 +171,7 @@ export const items = [
 			return board.map(x => ({ ...x, v: this.interacting(i, j, x.i, x.j) ? "X" : x.v }));
 		},
 		cost: 5,
-		rarity: "common"
+		rarity: "common",
 	},
 	{
 		id: "confusion",
@@ -193,9 +193,57 @@ export const items = [
 			return second.map((x, i) => ({ ...x, i: board[i].i, j: board[i].j }));
 		},
 		cost: 7,
-		rarity: "common"
+		rarity: "common",
 	},
+	{
+		id: "solarstrike",
+		name: "Solar Strike",
+		category: "trinket",
+		description() {
+			return (
+				<>
+					<div>Destroys all weak tiles in a plus shape.</div>
+					<MiniBoard board={{ w: 5, h: 5, pos: [2, 2], interacting: this.interacting, char: "!" }} />
+				</>
+			);
+		},
+		uses: 1,
+		interacting(ci, cj, i, j) {
+			return ci === i || cj === j;
+		},
+		use(board, i, j) {
+			return board.filter(x => (x.v !== "O" && x.v !== "X") || !this.interacting(i, j, x.i, x.j));
+		},
+		cost: 7,
+		rarity: "rare",
+	},
+
 ] satisfies Item[];
+export const generateItem = (filter: (item: Item) => boolean = () => true, amount: number = 1) => {
+	const pool = items.filter(x => filter(x));
+	let weighted = pool.map(x => ({ id: x.id, weight: x.rarity === "common" ? 1 : x.rarity === "rare" ? 0.1 : 0 }));
+	const out: Item[] = [];
+	for (let i = 0; i < amount; i++) {
+		const total = weighted.reduce((l, c) => l + c.weight, 0);
+		if (total === 0) return out;
+		const cumulative = weighted.reduce((l, c) => l.concat({ id: c.id, cumulative: (l.at(-1)?.cumulative ?? 0) + c.weight }), [] as { id: string; cumulative: number }[]);
+		const random = Math.random() * total;
+		const found = cumulative.find(x => random <= x.cumulative);
+		if (!found) return out;
+		weighted = weighted.filter(x => x.id !== found.id);
+		out.push(itemCache[found.id]);
+	}
+	return out;
+};
+export const generateShop = (tools: string[]) => {
+	return {
+		main: generateItem(x => !tools.includes(x.id), 3)
+	}
+};
+export interface ShopContents {
+	main: (Item | null)[];
+}
+
 const fisherYates = <T,>(list: readonly T[]) => {
 	const arr = [...list];
 	for (let i = arr.length - 1; i > 0; i--) {
