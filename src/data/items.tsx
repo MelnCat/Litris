@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { MiniBoard } from "../components/MiniBoard";
-import { digTile } from "../util/tiles";
+import { digTile, digTileModifiers } from "../util/tiles";
 
 export type ItemCategory = "tool" | "trinket";
 export type ItemRarity = "common" | "rare";
@@ -18,13 +18,13 @@ export interface ToolItem extends BaseItem {
 		id: string;
 		name: string;
 		description: ReactNode;
-		use(tile: { i: number; j: number; v: string; id: string }): { i: number; j: number; v: string; id: string } | { i: number; j: number; v: string; id: string }[];
+		use(tile: { i: number; j: number; v: string; id: string }, modifiers: { energy?: number }[]): { i: number; j: number; v: string; id: string } | { i: number; j: number; v: string; id: string }[];
 	};
 }
 export interface TrinketItem extends BaseItem {
 	category: "trinket";
 	interacting(ci: number, cj: number, i: number, j: number): boolean;
-	use(board: { i: number; j: number; v: string; id: string }[], i: number, j: number): { i: number; j: number; v: string; id: string }[];
+	use(board: { i: number; j: number; v: string; id: string }[], i: number, j: number, modifiers: { energy?: number }[]): { i: number; j: number; v: string; id: string }[];
 	uses?: number;
 }
 
@@ -145,8 +145,8 @@ export const items = [
 		interacting(ci, cj, i, j) {
 			return true;
 		},
-		use(board, i, j) {
-			return board.map(x => ({ ...x, v: digTile(x.v) }));
+		use(board, i, j, modifiers) {
+			return board.map(x => ({ ...x, v: digTileModifiers(x.v, modifiers) }));
 		},
 		cost: 10,
 		rarity: "rare",

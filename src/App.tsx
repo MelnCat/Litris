@@ -4,7 +4,7 @@ import { useEventListener, useHover } from "usehooks-ts";
 import styles from "./App.module.css";
 import shopImage from "./assets/shop.png?inline";
 import { generateShop, itemCache, items, type ShopContents, toolCache, trinketCache, type Item, type TrinketItem } from "./data/items";
-import { digTile } from "./util/tiles";
+import { digTile, digTileModifiers } from "./util/tiles";
 
 const sampleSize = <T,>(arr: T[], n: number): T[] => {
 	const remaining = arr.slice(0);
@@ -34,6 +34,10 @@ const createGrid = (level: number) => {
 	if (level >= 10)
 		for (const tile of sampleSize(tiles, 7 + Math.min(level - 10, 25))) {
 			tile.v = "R";
+		}
+	if (Math.random() <= 1 / 3)
+		for (const tile of sampleSize(tiles, Math.floor(Math.random() * 3) + 1)) {
+			tile.v = "E";
 		}
 	for (let i = 0; i < 14; i++) {
 		const row = tiles.filter(x => x.i === i);
@@ -228,20 +232,28 @@ function App() {
 		if (b === 2 && energy <= 0) return;
 		if (b === 2 && currentTrinket) return;
 		if (moves <= 0) return;
+		const modifiers: { energy?: number }[] = [];
+		const flushModifiers = () => {
+			for (const m of modifiers) {
+				if (m.energy) setEnergy(x => x + m.energy!);
+			}
+		};
 		if (currentTrinket) {
-			const newBoard = currentTrinket.use(board, ci, cj);
+			const newBoard = currentTrinket.use(board, ci, cj, modifiers);
 			setBoard(newBoard);
 			checkClears(true, false, newBoard);
 			setTrinketUses(x => ({ ...x, [currentTrinket.id]: (x[currentTrinket.id] ?? 0) + 1 }));
 			setTrinketIndex(-1);
+			flushModifiers();
 			return;
 		}
 		const newBoard = board.flatMap(x =>
-			(currentTrinket ?? currentTool).interacting(ci, cj, x.i, x.j) ? (b === 0 ? { ...x, v: digTile(x.v) } : currentTool.ability.use(x)) : x
+			(currentTrinket ?? currentTool).interacting(ci, cj, x.i, x.j) ? (b === 0 ? { ...x, v: digTileModifiers(x.v, modifiers) } : currentTool.ability.use(x, modifiers)) : x
 		);
 		checkClears(false, false, newBoard);
 		setMoves(x => x - 1);
 		if (b === 2) setEnergy(x => x - 1);
+		flushModifiers();
 	};
 	useEffect(() => {
 		if (stage !== "play" || levelComplete) return;
@@ -575,7 +587,9 @@ function App() {
 													</div>
 												)}
 											</div>
-											<div className={styles.price} data-unusable={(x && money < x.cost) || null}>{x ? `$${x.cost}` : "-"}</div>
+											<div className={styles.price} data-unusable={(x && money < x.cost) || null}>
+												{x ? `$${x.cost}` : "-"}
+											</div>
 										</div>
 									))}
 								</div>
